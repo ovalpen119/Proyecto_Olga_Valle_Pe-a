@@ -1,0 +1,69 @@
+---
+- name: Configurar Nginx como balanceador de carga
+  hosts: balanceador
+  become: yes
+
+  vars_files:
+    - ../vars/variables.yml
+  
+  
+  tasks:
+
+    - name: Actualizar los repositorios
+      apt:
+        update_cache: yes
+
+    - name: Actualizar los paquetes
+      apt:
+        upgrade: dist
+
+    - name: Instalar Nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Copiar configuración de balanceador de carga
+      template:
+        src: ../templates/load_balancer.conf
+        dest: /etc/nginx/sites-available/load_balancer.conf
+
+    - name: Deshabilitar el sitio por defecto de Nginx
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+
+    - name: Sustituir IP_FRONTEND_1 en la configuración
+      replace:
+        path: /etc/nginx/sites-available/load_balancer.conf
+        regexp: 'balanceador.IP_FRONTEND_1'
+        replace: '{{ balanceador.IP_FRONTEND_1 }}'
+
+    - name: Sustituir IP_FRONTEND_2 en la configuración
+      replace:
+        path: /etc/nginx/sites-available/load_balancer.conf
+        regexp: 'balanceador.IP_FRONTEND_2'
+        replace: '{{ balanceador.IP_FRONTEND_2 }}'
+
+    - name: Sustituir LE_DOMAIN en la configuración
+      replace:
+        path: /etc/nginx/sites-available/load_balancer.conf
+        regexp: 'certbot.domain'
+        replace: '{{ certbot.domain }}'
+
+
+    - name: Habilitar la configuración de Nginx
+      file:
+        src: /etc/nginx/sites-available/load_balancer.conf
+        dest: /etc/nginx/sites-enabled/load_balancer.conf
+        state: link
+
+    - name: Deshabilitar 000-default en Nginx
+      file:
+        path: /etc/nginx/sites-available/000-default.conf
+        state: absent
+
+    - name: Reiniciar Nginx
+      systemd:
+        name: nginx
+        state: reloaded
