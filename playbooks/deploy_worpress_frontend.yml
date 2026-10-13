@@ -1,0 +1,130 @@
+---
+- name: Playbook para instalar la pila LAMP en el FrontEnd
+  hosts: frontend1
+  become: yes
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+
+    - name: Descargar la utilidad WP-CLI
+      get_url:
+        url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+        dest: /usr/local/bin/wp
+        mode: 0755
+
+    - name: Asegurar permisos
+      file:
+        path: /usr/local/bin/wp
+        owner: www-data
+        group: www-data
+        mode: 0755
+
+   # - name: Eliminar todo el contenido dentro de /var/www/html/
+    #  file:
+    #    path: /var/www/html
+    #    state: absent
+        #become: yes
+
+   
+
+    - name: Descargar el código fuente de WordPress config
+      command: 
+        wp core download \
+        --path=/var/www/html \
+        --allow-root
+
+    - name: Crear el archivo de configuración de WordPress
+      command: 
+        wp config create \
+        --dbname="{{ db.name }}" \
+        --dbuser="{{ db.user }}" \
+        --dbpass="{{ db.password }}" \
+        --dbhost={{ ip.BACKEND_PRIVATE_IP }} \
+        --path={{ wordpress.directory }} \
+        --allow-root 
+
+    - name: Instalar WordPress
+      command: 
+        wp core install \
+        --url="{{ certbot.domain }}" \
+        --title="{{ wordpress.title }}" \
+        --admin_user="{{ wordpress.admin_user }}" \
+        --admin_password="{{ wordpress.admin_password }}" \
+        --admin_email="{{ wordpress.admin_email }}" \
+        --path="{{ wordpress.directory }}" \
+        --allow-root
+
+    - name: Asegurar permisos
+      file:
+        path: /var/www/html
+        owner: www-data
+        group: www-data
+        mode: 0755
+        recurse: yes
+
+    - name: Asegurar permisos de wp-content
+      file:
+        path: /var/www/html/wp-content/
+        owner: www-data
+        group: www-data
+        mode: 0755
+        recurse: yes
+
+    - name: Asegurar permisos de wp-content
+      file:
+        path: /var/www/html/wp-content/upgrade
+        owner: www-data
+        group: www-data
+        mode: 0755
+        recurse: yes
+
+    - name: Instalar y activar el tema Mindscape
+      command: 
+        wp theme install mindscape --activate 
+        --path=/var/www/html 
+        --allow-root
+  
+
+
+    - name: Instalar y activar el plugin wps-hide-login si no está instalado
+      command: 
+        wp plugin install wps-hide-login --activate 
+        --path=/var/www/html 
+        --allow-root 
+
+
+    - name: Configurar el plugin wps-hide-login
+      command: 
+        wp option update whl_page {{ wordpress.hide_login_url }} \
+        --path={{ wordpress.directory }} \
+        --allow-root
+
+
+    - name: Configurar los enlaces permanentes
+      command: 
+        wp rewrite structure '/%postname%/' \
+        --path={{ wordpress.directory }} \
+        --allow-root
+
+    - name: Copiar el archivo .htaccess al directorio de WordPress
+      copy:
+        src: ../htaccess/.htaccess
+        dest: "{{ wordpress.directory }}/.htaccess"
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    
+    - name: Asegurar que $_SERVER['HTTPS'] esté en wp-config.php
+      lineinfile:
+        path: /var/www/html/wp-config.php
+        line: "$_SERVER['HTTPS'] = 'on';"
+        state: present
+        insertbefore: "^define\\( 'DB_NAME', 'wordpress' \\);"
+
+    - name: Reiniciar el servidor web Apache
+      service:
+        name: apache2
+        state: restarted
