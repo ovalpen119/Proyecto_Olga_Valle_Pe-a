@@ -1,0 +1,1 @@
+/var/www/html  nfscliente.client_ip(rw,sync,no_root_squash,no_subtree_check)
