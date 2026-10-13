@@ -1,0 +1,33 @@
+---
+- name: Configurar cliente NFS y montar directorio
+  hosts: frontend
+  become: yes
+
+  vars_files:
+    - ../vars/variables.yml
+
+  tasks:
+    - name: Actualizar repositorios
+      apt:
+        update_cache: yes
+
+    - name: Instalar NFS Common
+      apt:
+        name: nfs-common
+        state: present
+
+
+
+    - name: Montar el directorio WordPress
+      command: 
+        mount {{ nfsserver.server_ip }}:{{ wordpress.directory }} {{ wordpress.directory }}
+
+
+    - name: Verificar el espacio en disco
+      command: df -h
+
+    - name: Actualizar el archivo /etc/fstab
+      lineinfile:
+        path: /etc/fstab
+        line: "{{ nfsserver.server_ip }}:{{ wordpress.directory }} {{ wordpress.directory }} nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800 0 0"
+        state: present
