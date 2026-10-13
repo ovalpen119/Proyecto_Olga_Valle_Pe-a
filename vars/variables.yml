@@ -1,0 +1,32 @@
+ip:
+    frontend_private_ip:
+    backend_private_ip:
+
+db:
+    name: wordpress
+    user: wordpress
+    password: password
+    
+certbot:
+    email: otrousuario@gmail.es
+    domain: olgavallepe.redirectme.net
+
+wordpress:
+  directory: /var/www/html
+  domain: "https://olgavallepe.redirectme.net"
+  title: "Mi Sitio WordPress"
+  admin_user: "admin"
+  admin_password: "password"
+  admin_email: "admin@example.com"
+  hide_login_url: "sitioescondido"
+  locale: es_ES
+
+nfsserver: 
+    server_ip: ""
+
+nfscliente:
+    client_ip: ""
+
+balanceador:
+    IP_FRONTEND_1: ""
+    IP_FRONTEND_2: ""
