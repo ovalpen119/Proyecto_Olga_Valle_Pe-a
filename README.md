@@ -39,3 +39,37 @@ El objetivo de este proyecto es implantar una plataforma web basada en WordPress
 └── exports
 
 ```
+
+## 4. Preparación de Ubuntu e instalación de Git
+
+Actualizar los paquetes:
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
+
+Instalar Git:
+
+```bash
+sudo apt install git -y
+```
+
+Comprobar la instalación:
+
+```bash
+git --version
+```
+
+Configurar el usuario:
+
+```bash
+git config --global user.name "TU_NOMBRE"
+git config --global user.email "TU_CORREO"
+```
+
+Clonar el repositorio:
+
+```bash
+git clone URL_DEL_REPOSITORIO
+```
