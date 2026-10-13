@@ -1,0 +1,6 @@
+# Claves privadas de SSH y AWS
+*.pem
+*.key
+
+# Archivos de configuración con secretos
+.env
