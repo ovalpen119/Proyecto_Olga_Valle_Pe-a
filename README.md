@@ -306,7 +306,7 @@ copia.
 
 Reinicia Apache para aplicar los cambios que lo requieran.
 
-### 8.8. Comprobaciones del frontend
+### 8.7. Comprobaciones del frontend
 
 Comprobar el estado de Apache:
 
@@ -329,6 +329,85 @@ automáticamente.
 estado de Apache.
 
 ![Comprobación de Apache](images/apache-frontend.png)
+
+
+## 9. Archivo de configuración de Apache: `templates/000-default.conf`
+
+Este archivo define el sitio que Apache sirve en el frontend. Es una
+configuración de Apache, no de Nginx.
+
+Contenido compartido:
+
+``` apache
+ServerSignature Off
+ServerTokens Prod
+
+<VirtualHost *:80>
+    DocumentRoot /var/www/html
+    DirectoryIndex index.php index.html
+    ServerName _dominio_
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+
+    <Directory "/var/www/html">
+        AllowOverride All
+    </Directory>
+</VirtualHost>
+```
+
+### 9.1. Ocultar información de la versión
+
+``` apache
+ServerSignature Off
+ServerTokens Prod
+```
+
+Estas directivas reducen la información de identificación de Apache que
+puede aparecer en determinadas respuestas y páginas de error.
+
+### 9.2. Definir el sitio web
+
+-   `<VirtualHost *:80>`: define el sitio que atiende las peticiones
+    recibidas en el puerto 80.
+-   `DocumentRoot /var/www/html`: establece el directorio de los
+    archivos web.
+-   `DirectoryIndex index.php index.html`: indica que Apache busque
+    primero `index.php` y después `index.html`.
+-   `ServerName`: especifica el nombre de dominio asociado al sitio.
+
+### 9.3. Registros
+
+-   `ErrorLog`: indica dónde se guardan los errores de Apache.
+-   `CustomLog`: registra las peticiones de acceso.
+
+### 9.4. Permitir el uso de `.htaccess`
+
+``` apache
+<Directory "/var/www/html">
+    AllowOverride All
+</Directory>
+```
+
+`AllowOverride All` permite que Apache aplique las directivas
+compatibles incluidas en `.htaccess`. Esto puede ser necesario para las
+reglas de enlaces permanentes de WordPress.
+
+El dominio de `ServerName` debe coincidir con el dominio que realmente
+se utiliza en el proyecto. El archivo también debe estar habilitado y
+ser aceptado por Apache antes de considerarlo operativo.
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## 9. Archivo principal main.yml
 
