@@ -697,6 +697,285 @@ frontend.
 ![Montaje del directorio NFS](images/nfs-client.png)
 
 
+## 14. Despliegue de WordPress en el frontend
+
+### Archivo `playbooks/deploy_wordpress_frontend.yml`
+
+Este playbook instala y configura WordPress en el grupo `frontend1`.
+Utiliza WP-CLI para descargar WordPress, generar `wp-config.php`,
+realizar la instalación inicial y configurar un tema, un plugin y los
+enlaces permanentes.
+
+
+### 14.1. Descarga de WP-CLI
+
+``` yaml
+- name: Descargar la utilidad WP-CLI
+  get_url:
+    url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+    dest: /usr/local/bin/wp
+    mode: '0755'
+```
+
+Descarga WP-CLI y lo guarda en `/usr/local/bin/wp`. El permiso `0755`
+permite ejecutar el archivo.
+
+El playbook original también cambia el propietario del archivo a
+`www-data`.
+
+### 14.3. Descarga del código fuente
+
+El playbook utiliza `wp core download` para descargar los archivos
+principales de WordPress en `wordpress.directory`.
+
+La tarea debe ejecutarse en un directorio preparado para recibir los
+archivos. Si WordPress ya está instalado, hay que comprobar el estado
+del directorio antes de repetirla.
+
+### 14.4. Creación de `wp-config.php`
+
+La tarea `wp config create` utiliza estas variables:
+
+-   `db.name`: nombre de la base de datos.
+-   `db.user`: usuario de MySQL.
+-   `db.password`: contraseña del usuario.
+-   La IP privada del backend: dirección del servidor MySQL.
+-   `wordpress.directory`: directorio de instalación.
+
+Este archivo contiene los parámetros de conexión entre WordPress y
+MySQL. La dirección IP debe utilizar el mismo nombre de variable que se
+haya definido en `variables.yml`.
+
+### 14.5. Instalación inicial de WordPress
+
+La tarea `wp core install` configura:
+
+-   `certbot.domain`: URL utilizada por la instalación.
+-   `wordpress.title`: título del sitio.
+-   `wordpress.admin_user`: usuario administrador.
+-   `wordpress.admin_password`: contraseña del administrador.
+-   `wordpress.admin_email`: correo del administrador.
+-   `wordpress.directory`: directorio de instalación.
+
+La base de datos y el usuario deben existir previamente, y el frontend
+debe poder conectarse al backend.
+
+### 14.6. Permisos de los archivos
+
+El playbook configura `www-data` como propietario y grupo de
+`/var/www/html`, `wp-content` y `wp-content/upgrade`.
+
+
+### 14.7. Instalación del tema Mindscape
+
+Se utiliza WP-CLI para instalar y activar el tema `mindscape`, que
+determina parte de la apariencia del sitio web.
+
+Si se vuelve a ejecutar el playbook, debe comprobarse si el tema ya está
+instalado para evitar errores innecesarios.
+
+### 14.8. Instalación del plugin `wps-hide-login`
+
+Se instala y activa el plugin `wps-hide-login`, que permite cambiar la
+URL de acceso al panel de administración.
+
+### 14.9. Configuración de la dirección de acceso
+
+El playbook actualiza la opción `whl_page` con el valor de
+`wordpress.hide_login_url`. De esta forma, se establece la ruta
+personalizada que utiliza el plugin.
+
+### 14.10. Configuración de los enlaces permanentes
+
+La tarea `wp rewrite structure` configura la estructura `/%postname%/`,
+que utiliza el nombre de la entrada en la URL.
+
+Por ejemplo, una entrada puede utilizar una ruta similar a
+`/mi-primera-entrada/`. Para que funcione, la configuración del servidor
+web debe permitir las reglas de reescritura correspondientes.
+
+### 14.11. Copia de `.htaccess`
+
+El playbook copia `../htaccess/.htaccess` al directorio de WordPress.
+Este archivo contiene reglas compatibles con Apache, por ejemplo, para
+los enlaces permanentes.
+
+La ruta de origen debe coincidir con la ubicación real del archivo en el
+repositorio. Las reglas de `.htaccess` no se aplican automáticamente si
+WordPress se sirve directamente mediante Nginx.
+
+### 14.12. Configuración de HTTPS en `wp-config.php`
+
+El playbook intenta añadir esta línea a `wp-config.php`:
+
+``` php
+$_SERVER['HTTPS'] = 'on';
+```
+
+La tarea utiliza un patrón `insertbefore` que busca una definición
+concreta de `DB_NAME` con el valor `wordpress`. Si el nombre de la base
+de datos o el formato de la línea son diferentes, puede no encontrar la
+coincidencia.
+
+Además, si HTTPS termina en el balanceador, WordPress debe reconocer
+correctamente las peticiones HTTPS reenviadas por el proxy. Esta
+configuración debe probarse con el dominio y el balanceador.
+
+
+### 14.14. Comprobaciones de WordPress
+
+Se puede comprobar la instalación con WP-CLI:
+
+``` bash
+sudo -u www-data wp core is-installed --path=/var/www/html
+```
+
+Si la instalación se ejecutó con `--allow-root`, también puede
+comprobarse con el usuario adecuado para la instalación. Además, hay que
+abrir el dominio y verificar que la página carga correctamente.
+
+**Capturas** resultado de WP-CLI y página principal de
+WordPress.
+
+![WordPress instalado](images/wordpress-instalado.png)
+
+## 15. Configuración de Nginx como balanceador de carga
+
+### Archivo `playbooks/setup_load_balancer.yml`
+
+Este playbook instala y configura Nginx en el servidor `balanceador`
+para distribuir las peticiones web entre los dos servidores frontend.
+
+### 15.1. Actualización e instalación
+
+El playbook actualiza los repositorios y los paquetes del sistema, e
+instala Nginx.
+
+### 15.2. Copia de la plantilla
+
+Copia `templates/load_balancer.conf` a
+`/etc/nginx/sites-available/load_balancer.conf`.
+
+A continuación, elimina el enlace del sitio predeterminado, sustituye
+los marcadores de las dos IP frontend y del dominio, y crea un enlace
+simbólico en `sites-enabled` para habilitar la configuración.
+
+Al final solicita a systemd que recargue Nginx. 
+
+### 15.3. Plantilla `templates/load_balancer.conf`
+
+El archivo compartido es:
+
+``` nginx
+upstream frontend_servers {
+    server balanceador.IP_FRONTEND_1;
+    server balanceador.IP_FRONTEND_2;
+}
+
+server {
+    listen 80;
+    server_name certbot.domain;
+
+    location / {
+        proxy_pass http://frontend_servers;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+```
+
+#### Definición de los frontend
+
+
+Los textos `balanceador.IP_FRONTEND_1` y `balanceador.IP_FRONTEND_2` se
+sustituyen por las direcciones configuradas en las variables del
+proyecto.
+
+#### Configuración del servidor
+
+-   `listen 80`: hace que Nginx escuche en el puerto HTTP 80.
+-   `server_name`: define el dominio que atiende el balanceador.
+-   `proxy_pass`: reenvía las peticiones al grupo `frontend_servers`.
+-   `proxy_set_header Host $host`: conserva el nombre de dominio
+    solicitado.
+-   `proxy_set_header X-Forwarded-For`: transmite la cadena de
+    direcciones IP de origen.
+-   `proxy_set_header X-Forwarded-Proto https`: informa al frontend de
+    que el protocolo original es HTTPS.
+
+La cabecera `X-Forwarded-Proto` está fijada en `https`. Esto solo es
+correcto si el diseño garantiza que las peticiones reenviadas
+corresponden a conexiones HTTPS externas
+
+### 15.4. Comprobaciones del balanceador
+
+``` bash
+sudo nginx -t
+sudo systemctl status nginx
+```
+
+`nginx -t` comprueba la sintaxis de la configuración. Después, hay que
+verificar que el dominio apunta a la IP pública del balanceador y que
+ambos frontend responden.
+
+**Captura** resultado de `nginx -t` y acceso a WordPress a
+través del dominio.
+
+![Configuración del balanceador](images/balanceador-nginx.png)
+
+## 16. Configuración de HTTPS mediante Let's Encrypt
+
+### Archivo `playbooks/setup_letsencrypt_https.yml`
+
+Este playbook configura HTTPS en el servidor `balanceador` mediante
+Certbot y Let's Encrypt.
+
+### 16.1. Selección del servidor y variables
+
+El playbook se ejecuta sobre el grupo `balanceador`, con privilegios de
+administrador, y carga `vars/variables.yml`.
+
+Utiliza `certbot.email` para el correo electrónico y `certbot.domain`
+para el dominio del certificado.
+
+### 16.2. Desinstalación de Certbot instalado mediante APT
+
+Se elimina el paquete `certbot` instalado por APT para preparar la
+instalación mediante Snap.
+
+### 16.3. Instalación de Certbot mediante Snap
+
+Se instala Certbot con Snap y se habilita el modo clásico.
+
+### 16.4. Solicitud del certificado
+
+El comando utilizado es equivalente a:
+
+``` bash
+sudo certbot --nginx -m CORREO --agree-tos --no-eff-email -d DOMINIO --non-interactive
+```
+
+Los marcadores `CORREO` y `DOMINIO` se sustituyen por las variables del
+proyecto. El parámetro `--nginx` permite a Certbot trabajar con la
+configuración de Nginx.
+
+Para que la solicitud funcione, el dominio debe apuntar al balanceador,
+Nginx debe estar instalado y correctamente configurado, y los puertos 80
+y 443 deben estar permitidos en los grupos de seguridad
+correspondientes.
+
+### 16.5. Orden y comprobaciones
+
+El balanceador debe estar instalado y tener una configuración válida
+antes de ejecutar Certbot. Después se puede probar el acceso mediante
+`https://` y comprobar la renovación del certificado.
+
+**Captura** salida de Certbot y acceso al dominio mediante
+HTTPS.
+
+![HTTPS con Let's Encrypt](images/https-lets-encrypt.png)
+
 
 ## 9. Archivo principal main.yml
 
