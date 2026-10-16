@@ -21,10 +21,16 @@ las comprobaciones reales.
 
 ## 2. Requisitos previos
 
-- Cuenta de AWS con acceso a EC2.
-- Clave SSH para acceder a las instancias.
-- Ansible instalado en la máquina de control.
-- Git instalado.
+-   Cuenta de AWS con acceso a EC2.
+-   Instancias Ubuntu para los servidores de la arquitectura.
+-   Clave privada SSH para acceder a las instancias.
+-   Ansible instalado en la máquina de control.
+-   Git instalado.
+-   Direcciones IP públicas y privadas de las instancias.
+-   Un dominio que apunte a la dirección pública del balanceador para
+    las pruebas con HTTPS.
+-   Grupos de seguridad de AWS configurados para permitir únicamente las
+    comunicaciones necesarias entre los servidores.
 
 ## 3. Estructura del repositorio
 ```
