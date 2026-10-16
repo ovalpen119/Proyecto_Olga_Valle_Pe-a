@@ -595,6 +595,107 @@ sudo exportfs -v
 
 
 
+## 13. Configuración de los clientes NFS
+
+### Archivo `playbooks/setup_nfs_client.yml`
+
+Este playbook configura los servidores frontend para montar el
+directorio compartido del servidor NFS en `/var/www/html`.
+
+### 13.1. Selección de los servidores e instalación
+
+
+Se ejecuta sobre el grupo `frontend`. El playbook actualiza los
+repositorios e instala `nfs-common`, que proporciona las herramientas de
+cliente NFS.
+
+### 13.2. Montaje del directorio compartido
+
+El playbook original utiliza un comando `mount` para montar el
+directorio del servidor NFS en el directorio de WordPress. Después
+ejecuta `df -h` y añade una entrada a `/etc/fstab`.
+
+La idea de la entrada de montaje es:
+
+``` text
+IP_SERVIDOR_NFS:/var/www/html /var/www/html nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800 0 0
+```
+
+`auto` permite intentar montar el recurso durante el arranque, `nofail`
+permite continuar el arranque si el montaje falla, `tcp` solicita TCP y
+`actimeo=1800` configura la caché de atributos.
+
+### 13.3. Automatización recomendada del montaje
+
+Para que el playbook pueda ejecutarse repetidamente sin fallar porque el
+recurso ya está montado, es preferible utilizar el módulo
+`ansible.posix.mount` en lugar de ejecutar `mount` directamente y
+gestionar `/etc/fstab` por separado.
+
+
+Después de instalar `nfs-common`, puedes sustituir las tareas originales
+de montaje y edición de `/etc/fstab` por una tarea como esta:
+
+
+``` yaml
+- name: Asegurar que el directorio de montaje existe
+  ansible.builtin.file:
+    path: "{{ wordpress.directory }}"
+    state: directory
+    mode: '0755'
+
+- name: Montar y registrar el recurso NFS
+  ansible.posix.mount:
+    src: "{{ nfsserver.server_ip }}:{{ wordpress.directory }}"
+    path: "{{ wordpress.directory }}"
+    fstype: nfs
+    opts: "defaults,_netdev,nofail,noatime,tcp,actimeo=1800"
+    state: mounted
+```
+
+`state: mounted` mantiene el recurso montado y asegura que la entrada
+correspondiente esté presente en `/etc/fstab`. Es más adecuado para
+repetir el playbook que ejecutar el comando `mount` en cada ocasión.
+
+Antes de aplicar este cambio, verifica que `nfsserver.server_ip` tenga
+la IP privada correcta y que el directorio remoto esté exportado. Si
+`/var/www/html` ya contiene archivos locales de WordPress, ten presente
+que montar NFS encima del directorio oculta temporalmente esos archivos
+locales; realiza una copia de seguridad o migra los archivos al recurso
+compartido antes de montarlo.
+
+Si necesitas desmontar el recurso deliberadamente y eliminar su entrada
+de `/etc/fstab`, puedes utilizar una tarea separada con `state: absent`,
+pero no la incluyas en el despliegue normal:
+
+``` yaml
+- name: Desmontar y retirar la entrada del recurso NFS
+  ansible.posix.mount:
+    path: "{{ wordpress.directory }}"
+    state: absent
+```
+
+No borres ni limpies `/var/www/html` mientras el recurso NFS esté
+montado: podrías borrar archivos del almacenamiento compartido o recibir
+errores por estar operando sobre un sistema de archivos montado.
+
+### 13.4. Comprobaciones del cliente
+
+``` bash
+findmnt /var/www/html
+df -h
+```
+
+El resultado de `findmnt` debe indicar que `/var/www/html` está montado
+desde el servidor NFS. También hay que comprobar que los grupos de
+seguridad de AWS permiten el tráfico NFS entre los clientes y el
+servidor, y que el servidor exporta las direcciones de ambos frontend.
+
+**Captura** resultado de `findmnt /var/www/html` en un
+frontend.
+
+![Montaje del directorio NFS](images/nfs-client.png)
+
 
 
 ## 9. Archivo principal main.yml
