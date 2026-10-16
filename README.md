@@ -59,6 +59,31 @@ Proyecto_Olga_Valle/
     └── setup_letsencrypt_https.yml
 ```
 
+## Proceso de implantación
+
+1. Crear las instancias EC2.
+2. Configurar los grupos de seguridad.
+3. Instalar Git y preparar Ansible.
+4. Configurar el inventario y las variables.
+5. Instalar y configurar los servicios web.
+6. Preparar la base de datos.
+7. Configurar el servidor y los clientes NFS.
+8. Configurar el balanceador de carga.
+9. Desplegar WordPress.
+10. Configurar HTTPS.
+11. Ejecutar las pruebas finales.
+
+## Seguridad
+
+- Restringir el acceso SSH.
+- Evitar la exposición innecesaria de puertos.
+- Utilizar IP privadas para las comunicaciones internas cuando corresponda.
+- Proteger las claves SSH y las credenciales de AWS.
+- No publicar contraseñas reales en GitHub.
+- Utilizar Ansible Vault para proteger las variables sensibles.
+- Limitar el acceso al servidor NFS.
+- Utilizar HTTPS para proteger las comunicaciones.
+
 ## 4. Preparación de Ubuntu e instalación de Git
 
 ### 4.1. Actualizar los paquetes:
@@ -977,74 +1002,102 @@ HTTPS.
 ![HTTPS con Let's Encrypt](images/https-lets-encrypt.png)
 
 
-## 9. Archivo principal main.yml
-
-El archivo `main.yml` organiza la ejecución de los playbooks y permite coordinar el despliegue de la infraestructura.
-
-Cada playbook se comprobará individualmente antes de integrarlo en la ejecución general.
-
-## 10. Configuración del dominio No-IP
+## 17. Configuración del dominio No-IP
 
 Se ha configurado un dominio mediante el servicio No-IP para acceder al sitio web utilizando un nombre de dominio en lugar de una dirección IP pública.
 
-Este dominio se utiliza para facilitar el acceso a WordPress y debe estar asociado a la dirección IP pública del punto de entrada de la infraestructura, normalmente la del balanceador de carga.
+El proyecto configura el dominio en `certbot.domain` para
+acceder a WordPress mediante un nombre de dominio en lugar de una IP
+pública.
 
-Además, el dominio debe coincidir con la configuración de WordPress y, si se habilita HTTPS, con la configuración del certificado SSL/TLS correspondiente.
+El dominio debe apuntar a la dirección pública del balanceador. También
+debe coincidir con el dominio configurado en WordPress, en la plantilla
+de Nginx y en la solicitud del certificado HTTPS.
 
-La configuración del dominio permite acceder al sitio web mediante una dirección más sencilla de recordar y facilita la posterior configuración del acceso seguro mediante HTTPS.
+Si el proveedor DNS cambia la IP pública del balanceador, debe
+actualizarse el registro correspondiente.
 
-## 11. Plantillas y archivos auxiliares
+## 18. Archivo principal `main.yml`
 
-### Archivo `.htaccess`
+El archivo `main.yml` permite importar los playbooks y organizar la
+ejecución de la infraestructura.
 
-Se ha creado el archivo `.htaccess` para definir reglas de configuración y acceso relacionadas con WordPress cuando se utiliza Apache. Permite gestionar determinadas reglas del sitio web, como las relacionadas con las URL amigables y otras directivas compatibles con este servidor.
+En la versión compartida, las importaciones aparecen así:
 
-Su uso dependerá de la configuración del servidor web. Si se utiliza Nginx, las reglas de Apache deberán adaptarse a la configuración de Nginx, ya que no se aplican directamente.
+``` yaml
+#- import_playbook: playbooks/install_lamp_frontend.yml
+#- import_playbook: playbooks/install_lamp_backend.yml
+#- import_playbook: playbooks/deploy_wordpress_backend.yml
+#- import_playbook: playbooks/setup_nfs_server.yml
+#- import_playbook: playbooks/setup_nfs_client.yml
+#- import_playbook: playbooks/setup_load_balancer.yml
+#- import_playbook: playbooks/setup_letsencrypt_https.yml
+- import_playbook: playbooks/deploy_wordpress_frontend.yml
+```
 
-### Plantilla `000-default.conf`
+Para ejecutar los playbooks importados, se utiliza:
 
-Plantilla utilizada para configurar el sitio web en el servidor web. Contiene los parámetros necesarios para definir cómo se sirve WordPress, incluyendo la configuración del sitio y las rutas correspondientes.
+``` bash
+ansible-playbook -i inventory/inventory main.yml
+```
 
-Ansible utiliza esta plantilla para generar y desplegar la configuración del servidor durante la instalación y configuración de WordPress.
-
-### Plantilla `login-balancer.conf`
-
-Plantilla utilizada para configurar el *load balancer* (balanceador de carga). Permite definir los parámetros necesarios para recibir las peticiones de los usuarios y distribuirlas entre los servidores web configurados en la infraestructura.
-
-Ansible utiliza esta plantilla para generar y desplegar la configuración del balanceador, facilitando el acceso al sitio web a través de un único punto de entrada.
+Antes de activar todas las importaciones, hay que resolver las
+dependencias. La base de datos debe estar creada antes de instalar
+WordPress; el almacenamiento NFS debe estar listo antes de desplegar
+WordPress sobre el directorio compartido; y Nginx debe estar instalado y
+configurado antes de solicitar el certificado con Certbot.
 
 
-## 12. Almacenamiento compartido NFS
+**Captura** salida real de la ejecución del archivo
+`main.yml`.
 
-El servidor NFS proporcionará almacenamiento compartido a los servidores autorizados.
+![Ejecución de Ansible](images/ejecucion-main.png)
 
-Los clientes NFS se configurarán para acceder a los directorios compartidos y permitir que los frontends utilicen los archivos comunes de WordPress.
+## 19. Validación final del proyecto
 
-## 13. HTTPS mediante Let's Encrypt
+Comprobaciones 
 
-Se utilizará Let's Encrypt para configurar certificados HTTPS cuando el dominio y los servicios web estén preparados.
+### 19.1. Apache
 
-## 14. Proceso de implantación
+``` bash
+sudo systemctl status apache2
+sudo apache2ctl configtest
+```
 
-1. Crear las instancias EC2.
-2. Configurar los grupos de seguridad.
-3. Instalar Git y preparar Ansible.
-4. Configurar el inventario y las variables.
-5. Instalar y configurar los servicios web.
-6. Preparar la base de datos.
-7. Configurar el servidor y los clientes NFS.
-8. Configurar el balanceador de carga.
-9. Desplegar WordPress.
-10. Configurar HTTPS.
-11. Ejecutar las pruebas finales.
+### 19.2. MySQL
 
-## 14. Seguridad
+``` bash
+sudo systemctl status mysql
+```
 
-- Restringir el acceso SSH.
-- Evitar la exposición innecesaria de puertos.
-- Utilizar IP privadas para las comunicaciones internas cuando corresponda.
-- Proteger las claves SSH y las credenciales de AWS.
-- No publicar contraseñas reales en GitHub.
-- Utilizar Ansible Vault para proteger las variables sensibles.
-- Limitar el acceso al servidor NFS.
-- Utilizar HTTPS para proteger las comunicaciones.
+Compruebar  que el frontend puede conectarse al backend con las
+credenciales configuradas.
+
+### 19.3. NFS
+
+``` bash
+sudo systemctl status nfs-kernel-server
+sudo exportfs -v
+findmnt /var/www/html
+```
+
+Ejecuta `exportfs -v` en el servidor NFS y `findmnt` en cada frontend.
+
+### 19.4. Nginx
+
+``` bash
+sudo nginx -t
+sudo systemctl status nginx
+```
+
+### 19.5. WordPress y HTTPS
+
+-   Abrir el dominio y verificar que la página principal de WordPress
+    carga correctamente.
+-   Confirmar que el navegador indica una conexión HTTPS válida.
+-   Comprobar que los enlaces permanentes funcionan.
+-   Verificar que el acceso al panel de administración utiliza la ruta
+    configurada.
+-   Revisar los registros si aparece algún error.
+
+
