@@ -137,7 +137,9 @@ clave privada disponible en la máquina de control.
 
 ## 6. Variables
 
-El archivo `vars/variables.yml` centraliza las variables de configuración de los servidores.
+El archivo `vars/variables.yml` centraliza los valores utilizados por
+los playbooks, como las direcciones IP, las credenciales de la base de
+datos, el dominio y el directorio de WordPress.
 
 Se incluyen variables para:
 
@@ -149,6 +151,49 @@ Se incluyen variables para:
 - Balanceador: direcciones IP de los servidores web.
 
 Las contraseñas y las claves privadas no deben publicarse en el repositorio.
+
+Ejemplo basado en la estructura compartida:
+
+
+``` yaml
+ip:
+  frontend_private_ip: ""
+  backend_private_ip: ""
+
+db:
+  name: 
+  user: 
+  password: 
+
+certbot:
+  email: otrousuario@gmail.es
+  domain: dominio
+
+wordpress:
+  directory: /var/www/html
+  domain: "https://dominio"
+  title: "Mi Sitio WordPress"
+  admin_user: ""
+  admin_password: ""
+  admin_email: "admin@example.com"
+  hide_login_url: ""
+  locale: es_ES
+
+nfsserver:
+  server_ip: ""
+
+nfscliente:
+  client_ip: ""
+
+balanceador:
+  IP_FRONTEND_1: ""
+  IP_FRONTEND_2: ""
+```
+
+Las IP vacías son marcadores de posición: deben completarse antes de
+ejecutar los playbooks. Los nombres de las variables deben escribirse
+exactamente igual en todos los archivos, ya que Ansible distingue entre
+mayúsculas y minúsculas.
 
 ## 7. Archivo .gitignore
 
@@ -163,9 +208,15 @@ Este archivo evita incorporar accidentalmente archivos sensibles al repositorio.
 *.log
 ```
 
-Si un archivo ya está siendo rastreado por Git, incluirlo en `.gitignore` no lo elimina del repositorio.
+Estas reglas evitan que Git añada archivos que coincidan con esos
+patrones cuando todavía no están siendo rastreados. No excluyen
+automáticamente `vars/variables.yml`.
 
-## 8. Playbooks de Ansible
+Si un archivo ya se ha añadido al repositorio, incluirlo posteriormente
+en `.gitignore` no elimina su historial ni las copias que ya se hayan
+subido..
+
+## 8.  Instalación y configuración del frontend
 
 Los playbooks creados son:
 
