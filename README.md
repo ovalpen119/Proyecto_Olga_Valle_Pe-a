@@ -34,60 +34,57 @@ las comprobaciones reales.
 
 ## 3. Estructura del repositorio
 ```
-.
+Proyecto_Olga_Valle/
 ├── README.md
-├── templates
-│   └── 000-default.conf
-    └──load_balancer.conf
-
-└── inventory
+├── main.yml
+├── .gitignore
+├── exports
+├── htaccess/
+│   └── .htaccess
+├── templates/
+│   ├── 000-default.conf
+│   └── load_balancer.conf
+├── inventory/
 │   └── inventory
-└── playbooks
-│   ├── setup_load_balancer.yml
-│   ├── install_lamp_frontend.yml
-│   ├── install_lamp_backend.yml
-│   ├── setup_nfs_server.yml
-│   ├── setup_nfs_client.yml
-│   ├── setup_letsencrypt_certificate.yml
-│   ├── deploy_wordpress_backend.yml
-│   └── deploy_wordpress_frontend.yml
-└── vars
+├── vars/
 │   └── variables.yml
-└── main.yml
-└──.gitignore
-└── exports
-
+└── playbooks/
+    ├── install_lamp_frontend.yml
+    ├── install_lamp_backend.yml
+    ├── deploy_wordpress_backend.yml
+    ├── deploy_wordpress_frontend.yml
+    ├── setup_nfs_server.yml
+    ├── setup_nfs_client.yml
+    ├── setup_load_balancer.yml
+    └── setup_letsencrypt_https.yml
 ```
 
 ## 4. Preparación de Ubuntu e instalación de Git
 
-Actualizar los paquetes:
+### 4.1. Actualizar los paquetes:
 
 ```bash
 sudo apt update
 sudo apt upgrade -y
 ```
+Estos comandos actualizan la información de los repositorios e instalan
+las actualizaciones disponibles.
 
-Instalar Git:
+### 4.2. Instalar Git
 
 ```bash
 sudo apt install git -y
 ```
 
-Comprobar la instalación:
+### 4.3. Configurar el usuario de Git
 
-```bash
-git --version
-```
-
-Configurar el usuario:
 
 ```bash
 git config --global user.name "TU_NOMBRE"
 git config --global user.email "TU_CORREO"
 ```
 
-Clonar el repositorio:
+### 4.4. Clonar el repositorio
 
 ```bash
 git clone URL_DEL_REPOSITORIO
@@ -95,7 +92,10 @@ git clone URL_DEL_REPOSITORIO
 
 ## 5. Inventario de Ansible
 
-El archivo `inventory/inventory` contiene los grupos de servidores y sus direcciones IP.
+El archivo `inventory/inventory` contiene los grupos de servidores y sus direcciones.
+
+Ejemplo de estructura:
+
 
 ```ini
 [frontend]
@@ -121,7 +121,19 @@ ansible_ssh_private_key_file=/home/ubuntu/ruta_clave_privada
 ansible_ssh_common_args='-o StrictHostKeyChecking=accept-new'       
 ```
 
-Las direcciones IP son ejemplos y deben sustituirse por las direcciones reales.
+Las direcciones IP son ejemplos y deben sustituirse por las direcciones reales.La ruta de `ansible_ssh_private_key_file` debe apuntar a la
+clave privada disponible en la máquina de control.
+
+
+-   `frontend`: incluye los dos servidores web.
+-   `frontend1`: identifica individualmente el primer frontend, al que
+    apunta el playbook de despliegue de WordPress.
+-   `backend`: identifica el servidor de MySQL.
+-   `balanceador`: identifica el servidor Nginx.
+-   `nfs`: identifica el servidor que comparte los archivos.
+
+
+
 
 ## 6. Variables
 
