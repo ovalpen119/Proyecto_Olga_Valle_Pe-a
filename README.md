@@ -218,16 +218,117 @@ subido..
 
 ## 8.  Instalación y configuración del frontend
 
-Los playbooks creados son:
+### Archivo `playbooks/install_lamp_frontend.yml`
 
-- `deploy_wordpress_backend.yml`: tareas relacionadas con el despliegue de WordPress en el backend.
-- `deploy_wordpress_frontend.yml`: despliegue de WordPress en los frontends.
-- `install_nginx_backend.yml`: instalación y configuración de Nginx en el backend.
-- `install_nginx_frontend.yml`: instalación y configuración de Nginx en los frontends.
-- `setup_letsencrypt_certificate.yml`: configuración de certificados HTTPS.
-- `setup_load_balancer.yml`: configuración del balanceador de carga.
-- `setup_nfs_client.yml`: configuración de los clientes NFS.
-- `setup_nfs_server.yml`: configuración del servidor NFS.
+Este playbook prepara los servidores frontend mediante la instalación de
+Apache y PHP, y copia la configuración del sitio web.
+
+### 8.1. Selección de los servidores
+
+``` yaml
+- name: Playbook para instalar la pila LAMP en el FrontEnd
+  hosts: frontend
+  become: yes
+```
+
+-   `name`: describe el propósito del playbook.
+-   `hosts: frontend`: ejecuta las tareas en los servidores del grupo
+    `frontend`.
+-   `become: yes`: permite realizar las tareas con privilegios de
+    administrador.
+
+
+### 8.2. Instalación de Apache
+
+``` yaml
+- name: Instalar el servidor web Apache
+  apt:
+    name: apache2
+    state: present
+```
+
+Instala Apache, que recibirá las peticiones web y servirá el contenido
+de WordPress.
+`state: present` indica que el paquete debe estar
+instalado.
+
+### 8.3. Copia de la configuración de Apache
+
+``` yaml
+- name: Copiar el archivo de configuración de Apache
+  copy:
+    src: ../templates/000-default.conf
+    dest: /etc/apache2/sites-available/
+    mode: '0644'
+```
+
+Copia `000-default.conf` desde `templates` al directorio de sitios
+disponibles de Apache. El archivo define la configuración del sitio web.
+
+### 8.4. Habilitación del módulo `rewrite`
+
+``` yaml
+- name: Habilitar el módulo rewrite de Apache
+  apache2_module:
+    name: rewrite
+    state: present
+```
+
+El módulo `rewrite` permite aplicar reglas de reescritura de URL,
+necesarias para determinados enlaces permanentes de WordPress. Si la
+tarea aparece duplicada en el playbook, basta con mantener una sola
+copia.
+
+### 8.5. Instalación de PHP
+
+``` yaml
+- name: Instalar PHP y los módulos necesarios
+  apt:
+    name:
+      - php
+      - php-mysql
+      - libapache2-mod-php
+    state: present
+```
+
+-   `php`: instala el intérprete de PHP.
+-   `php-mysql`: permite que PHP se conecte a MySQL.
+-   `libapache2-mod-php`: integra PHP con Apache.
+
+### 8.6. Reinicio de Apache
+
+``` yaml
+- name: Reiniciar el servidor web Apache
+  service:
+    name: apache2
+    state: restarted
+```
+
+Reinicia Apache para aplicar los cambios que lo requieran.
+
+### 8.8. Comprobaciones del frontend
+
+Comprobar el estado de Apache:
+
+``` bash
+sudo systemctl status apache2
+```
+
+Validar la sintaxis de la configuración de Apache:
+
+``` bash
+sudo apache2ctl configtest
+```
+
+La respuesta `Syntax OK` indica que la sintaxis comprobada es válida.
+También hay que confirmar que el sitio `000-default.conf` está
+habilitado, porque copiarlo a `sites-available` no lo activa
+automáticamente.
+
+**Captura** ejecución del playbook y comprobación del
+estado de Apache.
+
+![Comprobación de Apache](images/apache-frontend.png)
 
 ## 9. Archivo principal main.yml
 
