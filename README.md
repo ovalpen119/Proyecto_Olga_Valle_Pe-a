@@ -397,13 +397,201 @@ El dominio de `ServerName` debe coincidir con el dominio que realmente
 se utiliza en el proyecto. El archivo también debe estar habilitado y
 ser aceptado por Apache antes de considerarlo operativo.
 
+## 10. Instalación y configuración del backend
+
+### Archivo `playbooks/install_lamp_backend.yml`
+
+Este playbook prepara el servidor backend para alojar MySQL, la base de
+datos que utilizará WordPress.
+
+### 10.1. Selección del servidor y carga de variables
+
+``` yaml
+- name: Playbook para instalar la pila LAMP en el Backend
+  hosts: backend
+  become: yes
+  vars_files:
+    - ../vars/variables.yml
+```
+
+`vars_files`
+carga los valores definidos en `variables.yml`.
 
 
+### 10.2. Instalación de MySQL
+
+``` yaml
+- name: Instalar el sistema gestor de bases de datos MySQL
+  apt:
+    name: mysql-server
+    state: present
+```
+
+Instala MySQL para almacenar las entradas, páginas, usuarios y opciones de WordPress.
+
+### 10.3. Instalación de PyMySQL
+
+``` yaml
+- name: Instalar el módulo de pymysql
+  apt:
+    name: python3-pymysql
+    state: present
+```
+
+Instala la biblioteca que permite a Python comunicarse con MySQL y que
+puede ser necesaria para que los módulos de Ansible administren bases de datos y usuarios.
+
+### 10.4. Configuración de la dirección de escucha de MySQL  
+
+////
 
 
+### 10.5. Comprobaciones del backend
+
+``` bash
+sudo systemctl status mysql
+```
+
+Se puede revisar la dirección de escucha y confirmar que el puerto 3306
+está limitado a las interfaces previstas.
+
+**Captura** estado del servicio MySQL y comprobación de su
+configuración.
+
+![Comprobación de MySQL](images/mysql-backend.png)
 
 
+## 11. Despliegue de la base de datos de WordPress
 
+### Archivo `playbooks/deploy_wordpress_backend.yml`
+
+Este playbook crea la base de datos y el usuario de MySQL que utilizará
+WordPress.
+
+### 11.1. Creación de la base de datos
+
+En el archivo recibido, la primera tarea elimina la base de datos
+(`state: absent`) y después la vuelve a crear (`state: present`).
+
+
+``` yaml
+- name: Crear la base de datos de WordPress
+  community.mysql.mysql_db:
+    name: "{{ db.name }}"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+```
+
+### 11.2. Creación del usuario de MySQL
+
+El propósito de esta tarea es crear el usuario de WordPress y concederle
+permisos sobre su base de datos.
+
+``` yaml
+- name: Crear el usuario de la base de datos
+  community.mysql.mysql_user:
+    name: "{{ db.user }}"
+    password: "{{ db.password }}"
+    priv: "{{ db.name }}.*:ALL"
+    host: "{{ ip.frontend_private_ip }}"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+```
+
+-   `name`: nombre del usuario.
+-   `password`: contraseña del usuario.
+-   `priv`: permisos sobre las tablas de la base de datos especificada.
+-   `host`: dirección desde la que el usuario puede conectarse.
+-   `state: present`: garantiza que el usuario exista.
+-   `login_unix_socket`: permite administrar MySQL mediante el socket
+    local del backend.
+
+La IP configurada en `host` debe coincidir con la dirección de origen
+que MySQL ve cuando el frontend se conecta. Si hay dos frontend, ambos
+deben estar autorizados. La colección `community.mysql` y el método de
+autenticación deben ser compatibles con las versiones instaladas.
+
+_Reinicio del servicio_
+
+
+## 12. Configuración del servidor NFS
+
+### Archivo `playbooks/setup_nfs_server.yml`
+
+Este playbook prepara un servidor NFS (Network File System) para
+compartir los archivos de WordPress con los servidores frontend. Así,
+ambos frontend pueden acceder al mismo almacenamiento.
+
+### 12.1. Selección del servidor
+
+El grupo `nfs` identifica el servidor de almacenamiento compartido.
+
+### 12.2. Actualización e instalación
+
+El playbook actualiza los repositorios e instala el paquete
+`nfs-kernel-server`, que permite exportar directorios a otros equipos.
+
+### 12.3. Creación del directorio compartido
+
+``` yaml
+- name: Crear el directorio para WordPress
+  file:
+    path: /var/www/html
+    state: directory
+    owner: nobody
+    group: nogroup
+    mode: '0755'
+```
+
+Se crea `/var/www/html`, que será la ubicación compartida. Los permisos
+y la propiedad deben ser compatibles con el usuario con el que Apache y
+WordPress necesitan leer y escribir archivos.
+
+### 12.4. Copia y configuración de `exports`
+
+El playbook copia el archivo `exports` del proyecto a `/etc/exports` y
+sustituye el marcador `nfscliente.client_ip` por la variable
+correspondiente.
+
+El archivo recibido contiene:
+
+``` text
+/var/www/html nfscliente.client_ip(rw,sync,no_root_squash,no_subtree_check)
+```
+
+-   `/var/www/html`: directorio exportado.
+-   `nfscliente.client_ip`: cliente autorizado, sustituido por Ansible.
+-   `rw`: permite lectura y escritura.
+-   `sync`: confirma las escrituras una vez guardadas en el
+    almacenamiento.
+-   `no_root_squash`: conserva los privilegios de root del cliente sobre
+    el recurso compartido.
+-   `no_subtree_check`: desactiva determinadas comprobaciones de
+    subdirectorios.
+
+`no_root_squash` tiene implicaciones de seguridad y no debe utilizarse
+sin valorar el riesgo. Además, si los dos frontend necesitan montar el
+directorio, ambos deben estar autorizados en la configuración de
+exportación.
+
+### 12.5. Reinicio y comprobaciones
+
+El playbook reinicia el servicio `nfs-kernel-server`. Después se puede
+comprobar su estado:
+
+``` bash
+sudo systemctl status nfs-kernel-server
+```
+
+Y revisar los recursos exportados:
+
+``` bash
+sudo exportfs -v
+```
+
+**Captura** resultado de `exportfs -v`.
+
+![Configuración del servidor NFS](images/nfs-server.png)
 
 
 
