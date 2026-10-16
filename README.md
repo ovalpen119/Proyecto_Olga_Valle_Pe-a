@@ -4,7 +4,20 @@
 
 # 1. Introducción
 
-El objetivo de este proyecto es implantar una plataforma web basada en WordPress sobre Amazon Web Services (AWS).
+El objetivo de este proyecto es implantar una plataforma web basada en
+WordPress sobre Amazon Web Services (AWS), automatizando la
+configuración de los servidores mediante Ansible.
+
+La arquitectura separa las funciones principales en varios servidores:
+los servidores frontend ejecutan Apache, PHP y WordPress; el backend
+aloja MySQL; el servidor NFS proporciona almacenamiento compartido; y un
+servidor Nginx actúa como balanceador de carga y punto de entrada para
+las peticiones web. Se contempla también la configuración de HTTPS
+mediante Let's Encrypt.
+
+La documentación describe los playbooks, las plantillas y los archivos
+auxiliares del proyecto. Las capturas deben añadirse después de realizar
+las comprobaciones reales.
 
 ## 2. Requisitos previos
 
